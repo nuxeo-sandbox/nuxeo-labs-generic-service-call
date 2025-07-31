@@ -1,0 +1,9 @@
+Bundle-ActivationPolicy: lazy
+Bundle-ClassPath: .
+Manifest-Version: 1.0
+Bundle-Vendor: nuxeo.labs.generic.service.call
+Bundle-Version: 1.0.0
+Bundle-Name: nuxeo-labs-generic-service-call-core
+Bundle-ManifestVersion: 2
+Bundle-SymbolicName: nuxeo.labs.generic.service.call.nuxeo-labs-generic-service-call-core;singleton=true
+Nuxeo-Component: OSGI-INF/callservice-operation-contrib.xml
