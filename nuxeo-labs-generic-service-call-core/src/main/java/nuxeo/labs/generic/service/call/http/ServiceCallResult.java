@@ -41,8 +41,6 @@ public class ServiceCallResult {
 
     protected String responseMessage;
 
-    protected JSONArray objectKeysMapping = null;
-
     public ServiceCallResult(String response, int responseCode, String responseMessage) {
         super();
         this.response = response;

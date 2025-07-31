@@ -18,17 +18,15 @@
  */
 package nuxeo.labs.generic.service.call;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.JSONObject;
-import org.nuxeo.ecm.core.api.NuxeoException;
+
 import nuxeo.labs.generic.service.call.http.ServiceCall;
 import nuxeo.labs.generic.service.call.http.ServiceCallResult;
 
@@ -36,35 +34,40 @@ import nuxeo.labs.generic.service.call.http.ServiceCallResult;
  * This class handles authentication tokens and their lifespan. If a token was requested before expiration, it is
  * returned as is. Else, a new token is fetched.
  * 
- * 
  * @since 2023
  */
 public class AuthenticationToken {
-    
+
     private static final Logger log = LogManager.getLogger(AuthenticationToken.class);
     
+    protected String id;
+
     protected String token = null;
-    
+
     protected Instant tokenExpiration = null;
-    
+
     protected String authFullUrl;
-    
-    protected String clientId;
-    
-    protected String clientSecret;
+
+    protected Map<String, String> headers;
+
+    protected String body;
 
     protected ServiceCall serviceCall = new ServiceCall();
-    
-    ServiceType serviceType;
-    
-    public AuthenticationToken(String authFullUrl, String clientId, String clientSecret) {
+
+    public AuthenticationToken(String authFullUrl, Map<String, String> headers, String body) {
+        
+        id = UUID.randomUUID().toString();
 
         this.authFullUrl = authFullUrl;
-        this.clientId = clientId;
-        this.clientSecret = clientSecret;
-        
+        this.headers = headers;
+        this.body = body;
+
     }
     
+    public String getId() {
+        return id;
+    }
+
     /**
      * Will fetch a new token only if the current token is null or expired.
      * 
@@ -75,37 +78,12 @@ public class AuthenticationToken {
      * @since 2023
      */
     public String getToken() {
-        
-        if (StringUtils.isNotBlank(token) && !Instant.now().isAfter(tokenExpiration)) {
+
+        if (!isExpired()) {
             return token;
         }
-        
-        Map<String, String> headers = new HashMap<String, String>();
-        headers.put("Accept", "*/*");
-        headers.put("Accept-Encoding", "gzip, deflate, br");
-        // Not JSON...
-        headers.put("Content-Type", "application/x-www-form-urlencoded");
 
-        // Request body
-        String postData;
-        try {
-            postData = "client_id=" + URLEncoder.encode(clientId, "UTF-8") + "&client_secret="
-                    + URLEncoder.encode(clientSecret, "UTF-8") + "&grant_type=client_credentials";
-            switch(serviceType) {
-            case ENRICHMENT:
-                postData += "&scope=environment_authorization";
-                break;
-                
-            case DISCOVERY:
-                postData += "&scope=" + URLEncoder.encode("hxp hxp.integrations hxp.nucleus.account hxpr hxps", "UTF-8");
-                break;
-            }
-                    
-        } catch (UnsupportedEncodingException e) {
-            throw new NuxeoException("Failed to encode the request", e);
-        }
-
-        ServiceCallResult result = serviceCall.post(authFullUrl, headers, postData);
+        ServiceCallResult result = serviceCall.post(authFullUrl, headers, body);
 
         if (result.callWasSuccesful()) {
             JSONObject serviceResponse = result.getResponseAsJSONObject();
@@ -125,9 +103,26 @@ public class AuthenticationToken {
             log.error("Error getting an auth token:\n" + result.toJsonString(2));
             token = null;
         }
-        
+
         return token;
 
+    }
+    
+    public boolean isExpired() {
+        if (StringUtils.isNotBlank(token) && !Instant.now().isAfter(tokenExpiration)) {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Mainly used for moking in unit tests
+    public void setToken(String value) {
+        token = value;
+    }
+    
+    public void setTokenExpiration(int inNSeconds) {
+        tokenExpiration = Instant.now().plusSeconds(inNSeconds);
     }
 
 }

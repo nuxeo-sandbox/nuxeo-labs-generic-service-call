@@ -28,10 +28,14 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.json.JSONObject;
 
 /**
  * Utility class, centralizing the HTTP calls and returning a <code>ServiceCallResult</code>
@@ -41,6 +45,21 @@ import org.apache.logging.log4j.Logger;
 public class ServiceCall {
 
     private static final Logger log = LogManager.getLogger(ServiceCall.class);
+
+    public static Map<String, String> toHeadersMap(String headersJsonStr) {
+
+        Map<String, String> headers = new HashMap<>();
+        if (StringUtils.isNoneBlank(headersJsonStr)) {
+            JSONObject headersJson = new JSONObject(headersJsonStr);
+            Iterator<String> keys = headersJson.keys();
+            while (keys.hasNext()) {
+                String key = keys.next();
+                headers.put(key, headersJson.getString(key));
+            }
+        }
+
+        return headers;
+    }
 
     /**
      * Query params, if any, must be handled but the caller (and appended to the url, with the correct encoding)
