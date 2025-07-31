@@ -10,6 +10,7 @@ This plugin calls a service and returns the result. Caller is in charge of using
 
 
 > [!IMPORTANT]
-We use "generic" in the name as it does not call a hard coded service, but at first implementation, it does have a lot of limitation, especially in terms of authentication: First implementation handles a bearer token, calculated by a service to which we pass a clientId and clientSecret.
+> We use "generic" in the name as it does not call a hard coded service, but at first implementation, it does have a lot of limitation, especially in terms of authentication: First implementation handles a bearer token, calculated by a service to which we pass a clientId and clientSecret.
+>
 
 
