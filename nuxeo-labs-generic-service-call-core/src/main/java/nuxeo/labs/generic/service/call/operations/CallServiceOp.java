@@ -21,19 +21,23 @@ import nuxeo.labs.generic.service.call.http.ServiceCallResult;
 /**
  *
  */
-@Operation(id = CallServiceOp.ID, category = Constants.CAT_DOCUMENT, label = "Call a REST Service", description = "Call a service, returns the raw result.")
+@Operation(id = CallServiceOp.ID, category = Constants.CAT_DOCUMENT, label = "Call a REST Service", description = "Call a service, returns the raw result."
+        + " If tokenUuid is passed, it corresponds to a token fetched in a previous call (to Service.CallRESTServiceForToken) and it will be reused. If"
+        + " expired, a new token will be automatically fetched. The 'Authentication: Bearer <the token>' header will then be added to the headers."
+        + " If tokenUuid is not passed, then either the call is unauthenticated or you passed all the necessary info in the headers.")
 public class CallServiceOp {
 
-    public static final String ID = "Service.CallRESTService";
+    public static final String ID = "Services.CallRESTService";
 
     @Context
     protected CoreSession session;
+    
     @Param(name = "tokenUuid", required = false)
     protected String tokenUuid;
 
     // If not passed, we assume the headers have the authentication info
-    @Param(name = "method", required = true)
-    protected String method;
+    @Param(name = "httpMethod", required = true)
+    protected String httpMethod;
 
     @Param(name = "url", required = true)
     protected String url;
@@ -58,21 +62,21 @@ public class CallServiceOp {
             headers.put("Authentication", "Bearer " + tokenStr);
         }
         
-        switch (method.toLowerCase()) {
-        case "get":
+        switch (httpMethod.toUpperCase()) {
+        case "GET":
             result = serviceCall.get(url, headers);
             break;
             
-        case "post":
+        case "POST":
             result = serviceCall.post(url, headers, bodyStr);
             break;
             
-        case "put":
+        case "PUT":
             result = serviceCall.put(url, headers, bodyStr);
             break;
             
         default:
-            throw new NuxeoException("Operatoon supports only GET/PUT or POST. Received <" + method + ">");
+            throw new NuxeoException("Operation supports only GET/PUT or POST. Received <" + httpMethod + ">");
         }
         
         

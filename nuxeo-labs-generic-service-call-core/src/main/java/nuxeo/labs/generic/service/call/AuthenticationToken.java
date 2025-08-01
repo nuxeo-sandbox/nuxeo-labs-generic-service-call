@@ -26,6 +26,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.JSONObject;
+import org.nuxeo.ecm.core.api.NuxeoException;
 
 import nuxeo.labs.generic.service.call.http.ServiceCall;
 import nuxeo.labs.generic.service.call.http.ServiceCallResult;
@@ -39,8 +40,10 @@ import nuxeo.labs.generic.service.call.http.ServiceCallResult;
 public class AuthenticationToken {
 
     private static final Logger log = LogManager.getLogger(AuthenticationToken.class);
-    
+
     protected String id;
+
+    protected String httpMethod;
 
     protected String token = null;
 
@@ -51,19 +54,22 @@ public class AuthenticationToken {
     protected Map<String, String> headers;
 
     protected String body;
+    
+    protected JSONObject serviceResponse;
 
     protected ServiceCall serviceCall = new ServiceCall();
 
-    public AuthenticationToken(String authFullUrl, Map<String, String> headers, String body) {
-        
+    public AuthenticationToken(String httpMethod, String authFullUrl, Map<String, String> headers, String body) {
+
         id = UUID.randomUUID().toString();
 
+        this.httpMethod = httpMethod.toUpperCase();
         this.authFullUrl = authFullUrl;
         this.headers = headers;
         this.body = body;
 
     }
-    
+
     public String getId() {
         return id;
     }
@@ -83,10 +89,27 @@ public class AuthenticationToken {
             return token;
         }
 
-        ServiceCallResult result = serviceCall.post(authFullUrl, headers, body);
+        ServiceCallResult result;
+
+        switch (httpMethod) {
+        case "GET":
+            result = serviceCall.get(authFullUrl, headers);
+            break;
+            
+        case "POST":
+            result = serviceCall.post(authFullUrl, headers, body);
+            break;
+
+        case "PUT":
+            result = serviceCall.put(authFullUrl, headers, body);
+            break;
+
+        default:
+            throw new NuxeoException("Invalid HTTP method (<" + httpMethod + ">: We support only GET/POST/PUSH.");
+        }
 
         if (result.callWasSuccesful()) {
-            JSONObject serviceResponse = result.getResponseAsJSONObject();
+            serviceResponse = result.getResponseAsJSONObject();
             // {"error":"invalid_grant","error_description":"Caller not authorized for requested resource"}
             if (serviceResponse.has("error")) {
                 String msg = "Getting a token failed with error " + serviceResponse.getString("error") + ".";
@@ -107,22 +130,35 @@ public class AuthenticationToken {
         return token;
 
     }
-    
+
     public boolean isExpired() {
         if (StringUtils.isNotBlank(token) && !Instant.now().isAfter(tokenExpiration)) {
             return false;
         }
-        
+
         return true;
     }
-    
+
     // Mainly used for moking in unit tests
     public void setToken(String value) {
         token = value;
     }
-    
+
     public void setTokenExpiration(int inNSeconds) {
         tokenExpiration = Instant.now().plusSeconds(inNSeconds);
+    }
+    
+    public JSONObject tokenToJSONObject() {
+        
+        JSONObject obj = null;
+        if(serviceResponse != null) {
+            obj = new JSONObject(serviceResponse.toString());
+        } else {
+            obj = new JSONObject();
+        }
+        obj.put("tokenUuid", id);
+        
+        return obj;
     }
 
 }

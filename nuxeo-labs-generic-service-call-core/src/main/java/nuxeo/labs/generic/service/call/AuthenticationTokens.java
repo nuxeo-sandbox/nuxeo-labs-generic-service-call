@@ -48,14 +48,15 @@ public class AuthenticationTokens {
         return tokens.get(tokenUUID);
     }
 
-    public AuthenticationToken newToken(String authFullUrl, Map<String, String> headers, String body) {
+    public AuthenticationToken newToken(String httpMethod, String authFullUrl, Map<String, String> headers,
+            String body) {
 
-        AuthenticationToken token = new AuthenticationToken(authFullUrl, headers, body);
+        AuthenticationToken token = new AuthenticationToken(httpMethod, authFullUrl, headers, body);
         tokens.put(token.getId(), token);
 
         return token;
     }
-    
+
     public void removeToken(String tokenUUID) {
         tokens.remove(tokenUUID);
     }
