@@ -1,11 +1,5 @@
 # nuxeo-labs-generic-service-call
 
-This is Work In Progress. Do not use "as is".
-
-We'll explain later what it is supposed to do :-)
-
-<hr>
-
 This plugin calls a service and returns the result. Caller is in charge of using the correct HTTP verb (Support for GET/PUT/POST) and setting the correct payload when needed. As first implementation this plugin has some limitation (see below). But anyone is welcome to Pull request :-).
 
 One of the goal of the plugin is to handle authentication token (typically for M2M communication) with an expiration time, so as long as a token is not expired, there is no need to request a new one.
@@ -165,6 +159,7 @@ function run(input, params) {
 
 
 <br>
+
 ## Installation/Deployment
 The plug is available in the [Public Nuxeo MarketPlace](https://connect.nuxeo.com/nuxeo/site/marketplace/package/nuxeo-labs-generic-service-call) and can be added as a dependency to a Nuxeo Studio project, or installed with Docker (added to `NUXEO_PACKAGES`), or installed via:
 
