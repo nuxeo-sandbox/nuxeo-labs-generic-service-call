@@ -130,8 +130,12 @@
       <fileset dir="${outdir}/marketplace/install/bundles" />
     </nx:studioExtraction>
 
+    <!--
     <zip destfile="${outdir}/${maven.project.artifactId}-${maven.project.version}.zip" basedir="${outdir}/marketplace" />
     <artifact:attach file="${outdir}/${maven.project.artifactId}-${maven.project.version}.zip" type="zip" />
+    -->
+    <zip destfile="${outdir}/nuxeo-labs-generic-service-call-${maven.project.version}.zip" basedir="${outdir}/marketplace" />
+    <artifact:attach file="${outdir}/nuxeo-labs-generic-service-call-${maven.project.version}.zip" type="zip" />
 
     <!-- cleanups -->
     <delete dir="${outdir}/marketplace" failonerror="false" />
