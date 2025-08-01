@@ -9,7 +9,7 @@
 
   <groupId>nuxeo.labs.generic.service.call</groupId>
   <artifactId>nuxeo-labs-generic-service-call-parent</artifactId>
-  <version>2023.2.0-SNAPSHOT</version>
+  <version>2023.3.0-SNAPSHOT</version>
   <name>Nuxeo labs generic service call parent</name>
   <description />
   <packaging>pom</packaging>
