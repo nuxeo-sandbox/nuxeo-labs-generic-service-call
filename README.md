@@ -22,12 +22,17 @@ Typically, you will do the following:
 
 ## Automation
 
+* `Services.CallRESTServiceForToken`
+* `Services.CallRESTService`
+* `Services.DownloadFile`
+* `Services.UploadFile`
+
 ### `Services.CallRESTServiceForToken`
 
 Call a service for M2M token authentication purpose. Returns a JSON blobn with the values plus a specific `tokenUuid` property, to be used for next calls, and, so, avoid asking for a new token only when needed (when the token is expired)
 
 * Input: `void`
-* Output: `blob`, a JSON blob (call its `getString()` method to get the JSON string)
+* Output: `blob`, a JSON blob, result of the call (use its `getString()` method to get the JSON string)
 * Parameters:
   * `httpMethod`,: String, required. The method to use. "GET", "POST" or "PUT" (case insensitive)
   * `url`: String, required. The URL to use for authentication
@@ -41,7 +46,7 @@ The operation creates a Token object, stored in memory so it can be reused. The 
 Call a service and returns the result as JSON.
 
 * Input: `void`
-* Output: `blob`, a JSON blob (call its `getString()` method to get the JSON string)
+* Output: `blob`, a JSON blob, result of the call (use its `getString()` method to get the JSON string)
 * Parameters:
   * `tokenUuid`: String, optional. The M2M Bearer token to use
   * `httpMethod`,: String, required. The method to use. "GET", "POST" or "PUT" (case insensitive)
@@ -49,13 +54,41 @@ Call a service and returns the result as JSON.
   * `headersJsonStr`: String, optional. A JSON string with the headers to use.
   * `bodyStr`: String, optional. The body to pass as is, if needed (for POST/PUT only)
 
-The method calls at `url`, using the `httpMethod` and passing the headers (and optionaly the body).
+The method calls the service at `url`, using the `httpMethod` and passing the headers (and optionaly the body).
 
 If `tokenUuid` is passed, it corresponds to a token fetched in a previous call to `Services.CallRESTServiceForToken`) and it will be reused. If expired, a new token will be automatically fetched. If not passed, then either the call is unauthenticated, or you passed the expected values in the headers or the body.
 
 When `tokenUuid` is passed, the operaiton adds the `Authentication: Bearer <the_token_value>` header.
 
 See below the example(s) of use.
+
+### `Services.DownloadFile`
+
+Call a service to download a File and returns the corresponding Blob
+
+* Input: `void`
+* Output: `blob`, the downloaded blob, or `null` if an error occured
+* Parameters
+  * `tokenUuid`: String, optional. The M2M Bearer token to use
+  * `url`: String, required. The URL to use.
+  * `headersJsonStr`: String, optional. A JSON string with the headers to use.
+
+The method calls the service at `url`, and downloadq the corresponding file, encapsulating to a regular `Blob`
+
+### `Services.UploadFile`
+
+Call a service to upload a File, using "POST" or "PUT"
+
+* Input: `blob` or `document`
+* Output: `blob`, a JSON blob, result of the call (use its `getString()` method to get the JSON string)
+* Parameters
+  * `tokenUuid`: String, optional. The M2M Bearer token to use
+  * `httpMethod`,: String, required. The method to use. "POST" or "PUT" (case insensitive)
+  * `url`: String, required. The URL to use.
+  * `headersJsonStr`: String, optional. A JSON string with the headers to use.
+  * `xpath`: String, optional. The XPATH to use when the input is `document`. Default is the main blob, at `file:content`.
+
+The method calls the service at `url`, and uploads the file backed by the blob.
 
 
 <br>
@@ -152,7 +185,30 @@ function run(input, params) {
     // . . . do something with the result . . .
   }
   
-  // ====================> etc...
+  // ====================> Download a file
+  Blob downloaded = Services.DownloadFile(
+    null, {
+      "tokenUuid": tokenId,
+      "url": baseUrl + "/someEndpoint/For/A/File/T/DoDownload"
+      // "headersJsonStr": JSON.stringify(headersJson) no headers here. Plugin will had whats relevant
+    });
+  // . . . do something with the downloaded blob . . .
+  
+  // ====================> Upload a file, with POST, from custom field myschema:myfile of the input
+  resultBlob = Services.UploadFile(
+    null, {
+      "tokenUuid": tokenId,
+      "httpMethod": "POST",
+      "url": baseUrl + "/someEndpointWithPOST",
+      "headersJsonStr": JSON.stringify(headersJson),
+      "xpath": "myschema:myfile"
+    });
+  resultJson = JSON.parse(resultBlob.getString());
+  if(resultJson.responseCode === 200) {
+    // . . . continue . . .
+  }
+  
+  // ====================> ...etc...
 
 }
 ```

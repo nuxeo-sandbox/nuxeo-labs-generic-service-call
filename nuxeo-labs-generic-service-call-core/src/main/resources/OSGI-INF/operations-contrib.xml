@@ -4,6 +4,8 @@
   <extension point="operations" target="org.nuxeo.ecm.core.operation.OperationServiceComponent">
     <operation class="nuxeo.labs.generic.service.call.operations.CallServiceOp"/>
     <operation class="nuxeo.labs.generic.service.call.operations.CallServiceForTokenOp"/>
+    <operation class="nuxeo.labs.generic.service.call.operations.UploadFileOp"/>
+    <operation class="nuxeo.labs.generic.service.call.operations.DownloadFileOp"/>
   </extension>
 
 </component>

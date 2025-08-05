@@ -21,13 +21,21 @@ package nuxeo.labs.generic.service.call.http;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.BodyPublishers;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -36,6 +44,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.JSONObject;
+import org.nuxeo.ecm.core.api.Blob;
+import org.nuxeo.ecm.core.api.Blobs;
+import org.nuxeo.ecm.core.api.CloseableFile;
+import org.nuxeo.ecm.core.api.NuxeoException;
+import org.nuxeo.ecm.platform.mimetype.interfaces.MimetypeRegistry;
+import org.nuxeo.runtime.api.Framework;
 
 /**
  * Utility class, centralizing the HTTP calls and returning a <code>ServiceCallResult</code>
@@ -49,7 +63,7 @@ public class ServiceCall {
     public static Map<String, String> toHeadersMap(String headersJsonStr) {
 
         Map<String, String> headers = new HashMap<>();
-        if (StringUtils.isNoneBlank(headersJsonStr)) {
+        if (StringUtils.isNotBlank(headersJsonStr)) {
             JSONObject headersJson = new JSONObject(headersJsonStr);
             Iterator<String> keys = headersJson.keys();
             while (keys.hasNext()) {
@@ -156,46 +170,178 @@ public class ServiceCall {
         return result;
     }
 
+    public ServiceCallResult uploadBlob(String putOrPost, Blob blob, String targetUrl, Map<String, String> headers) {
+
+        try (CloseableFile f = blob.getCloseableFile()) {
+            String mimeType = blob.getMimeType();
+            if (StringUtils.isBlank(mimeType)) {
+                MimetypeRegistry registry = Framework.getService(MimetypeRegistry.class);
+                mimeType = registry.getMimetypeFromBlob(blob);
+            }
+            return uploadFile(putOrPost, f.getFile(), targetUrl, mimeType, headers);
+        } catch (IOException e) {
+            throw new NuxeoException("IOException while uploading the blob.", e);
+        }
+    }
+
     /**
-     * The "response" field of <code>ServiceCallResult</code> is always an empty JSON object, "{}".
+     * Upload a file with PUT or POST. If POST, ahdnel big files and sending chunks.
      * 
+     * @param putOrPost
      * @param file
      * @param targetUrl
      * @param contentType
-     * @return a Response
+     * @param headers
+     * @return
      * @throws IOException
-     * @since 2023
+     * @since TODO
      */
-    public ServiceCallResult uploadFileWithPut(File file, String targetUrl, String contentType) throws IOException {
+    public ServiceCallResult uploadFile(String putOrPost, File file, String targetUrl, String contentType,
+            Map<String, String> headers) {
+        
+        putOrPost = putOrPost.toUpperCase();
+        switch (putOrPost) {
+        case "POST":
+        case "PUT":
+            break;
 
-        if (!file.exists() || !file.isFile()) {
-            throw new IllegalArgumentException("Invalid file: " + file.getAbsolutePath());
+        default:
+            throw new NuxeoException("Oonly PUT or POST handled.");
         }
+        
+        ServiceCallResult result = null;
 
-        HttpURLConnection connection = (HttpURLConnection) new URL(targetUrl).openConnection();
-        connection.setDoOutput(true);
-        connection.setRequestMethod("PUT");
-        connection.setRequestProperty("Content-Type", contentType);
-        connection.setFixedLengthStreamingMode(file.length());
-
-        ServiceCallResult result;
-        try (OutputStream out = connection.getOutputStream(); InputStream in = new FileInputStream(file)) {
-
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = in.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
+        if (StringUtils.isBlank(contentType)) {
+            try {
+                contentType = Files.probeContentType(file.toPath());
+            } catch (IOException e) {
+                contentType = "application/octet-stream";
             }
-            out.flush();
-
-            result = new ServiceCallResult("{}", connection.getResponseCode(), connection.getResponseMessage());
-
-        } catch (IOException e) {
-            log.error("Error uploading file with PUT", e);
-            result = new ServiceCallResult("{}", -1, e.getMessage());
+        }
+        
+        try {
+            HttpClient client = HttpClient.newHttpClient();
+    
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
+                                                     .uri(URI.create(targetUrl))
+                                                     .header("Content-Type", contentType);
+            // Add custom headers
+            if (headers != null && !headers.isEmpty()) {
+                headers.forEach(builder::header);
+            }
+            
+            // Choose method
+            HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofFile(file.toPath());
+            switch (putOrPost) {
+                case "POST" -> builder.POST(body);
+                case "PUT" -> builder.PUT(body);
+            }
+            
+            // Build
+            HttpRequest request = builder.build();
+    
+            // Call
+            HttpResponse<String> response;
+            try {
+                response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                // Remember nothing to close, this is handled by BodyHandlers.ofString()
+                result = new ServiceCallResult("{}", response.statusCode(), response.body());
+            } catch (IOException | InterruptedException e) {
+                result = new ServiceCallResult("{}", -1, "Error uploading the file: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            throw new NuxeoException("Exception while uploading the blob.", e);
         }
 
         return result;
+        
+    }
+
+
+    /**
+     * @param targetUrl
+     * @param headers
+     * @return
+     * @since TODO
+     */
+    public ServiceCallResult downloadFile(String targetUrl, Map<String, String> headers) {
+
+        ServiceCallResult result = null;
+        Blob blob = null;
+        HttpURLConnection connection = null;
+
+        try {
+            URL url = new URL(targetUrl);
+            connection = (HttpURLConnection) url.openConnection();
+
+            connection.setRequestMethod("GET");
+            connection.setDoInput(true);
+
+            // Add custom headers
+            if (headers != null) {
+                headers.forEach(connection::setRequestProperty);
+            }
+
+            int status = connection.getResponseCode();
+
+            if (status < 200 || status >= 300) {
+                String error = "";
+                try (InputStream errorStream = connection.getErrorStream()) {
+                    if (errorStream != null) {
+                        error = new String(errorStream.readAllBytes());
+                    }
+                } catch (IOException e) {
+                    // Ignore
+                }
+                Blob nullBlob = null;
+                result = new ServiceCallResult(nullBlob, status, error);
+
+            } else {
+
+                String filename = extractFileName(connection, url);
+                String mimeType = connection.getContentType();
+                blob = Blobs.createBlobWithExtension(".tmp");
+                blob.setFilename(filename);
+                blob.setMimeType(mimeType);
+                File destinationFile = blob.getFile();
+
+                // Stream content to file
+                try (InputStream in = connection.getInputStream();
+                        OutputStream out = new FileOutputStream(destinationFile)) {
+                    in.transferTo(out);
+                }
+
+                result = new ServiceCallResult(blob, status, connection.getResponseMessage());
+            }
+
+        } catch (IOException e) {
+
+            throw new NuxeoException("Error downloading a file", e);
+
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+                connection = null;
+            }
+        }
+
+        return result;
+    }
+
+    // Extract filename from Content-Disposition header or URL
+    public static String extractFileName(HttpURLConnection connection, URL url) {
+        String contentDisposition = connection.getHeaderField("Content-Disposition");
+
+        if (contentDisposition != null && contentDisposition.contains("filename=")) {
+            String[] parts = contentDisposition.split("filename=");
+            if (parts.length > 1) {
+                return parts[1].replaceAll("\"", "").trim();
+            }
+        }
+
+        // fallback: get filename from URL
+        String path = url.getPath();
+        return path.substring(path.lastIndexOf('/') + 1);
     }
 
     /**

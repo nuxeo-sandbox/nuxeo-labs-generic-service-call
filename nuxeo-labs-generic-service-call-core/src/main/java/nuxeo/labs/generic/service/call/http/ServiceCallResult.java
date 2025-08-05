@@ -21,7 +21,9 @@ package nuxeo.labs.generic.service.call.http;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.NuxeoException;
+
 
 /**
  * Class handling the result of a HTTP call to the service. It encapsulates 3 values:
@@ -29,28 +31,33 @@ import org.nuxeo.ecm.core.api.NuxeoException;
  * <li>responseCode: The HTTP status (200, 401, 404, etc.), as returned by the service</li>
  * <li>responseMessage: The response message, as returned by the service ("OK" for example)</li>
  * <li>response: The response as returned by the service</li>
+ * <li>When downloading a file, there will be no response property but a responseBlob one.
  * </ul
  * 
  * @since 2023
  */
 public class ServiceCallResult {
 
-    protected String response;
+    protected String response = null;
 
     protected int responseCode;
 
-    protected String responseMessage;
+    protected String responseMessage = null;
+    
+    protected Blob responseBlob = null;
 
     public ServiceCallResult(String response, int responseCode, String responseMessage) {
         super();
+        
         this.response = response;
         this.responseCode = responseCode;
         this.responseMessage = responseMessage;
     }
 
-    public ServiceCallResult(String response, int responseCode, String responseMessage, JSONArray objectKeysMapping) {
+    public ServiceCallResult(Blob responseBlob, int responseCode, String responseMessage) {
         super();
-        this.response = response;
+        
+        this.responseBlob = responseBlob;
         this.responseCode = responseCode;
         this.responseMessage = responseMessage;
     }
@@ -65,7 +72,7 @@ public class ServiceCallResult {
     }
 
     /**
-     * @return the JSON object of thsi object
+     * @return the JSON object of this object
      * @since 2023
      */
     public JSONObject toJsonObject() {
@@ -78,12 +85,14 @@ public class ServiceCallResult {
             } else {
                 obj.put("response", new JSONObject(response));
             }
-        } else {
+        } else if (responseBlob == null){
             if(isHttpSuccess(responseCode)) {
                 obj.put("response", new JSONObject("{\"errorMessage\": \"Empty string as response\"}"));
             } else {
                 obj.put("response", new JSONObject("{}"));
             }
+        } else {
+            obj.put("responseBlob", responseBlob.toString());
         }
         obj.put("responseCode", responseCode);
         obj.put("responseMessage", (responseMessage == null ? "" : responseMessage));
@@ -118,6 +127,10 @@ public class ServiceCallResult {
         String result = StringUtils.removeStart(response, "\"");
         result = StringUtils.removeEnd(result, "\"");
         return result;
+    }
+    
+    public Blob getResponseBlob() {
+        return responseBlob;
     }
 
     /**

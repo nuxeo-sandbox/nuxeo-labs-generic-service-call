@@ -19,7 +19,7 @@ import nuxeo.labs.generic.service.call.http.ServiceCall;
  * Notice the same can be achieved with CallServiceOp, but here we explictely now it's a bout getting a token, so
  * we return the token ID.
  */
-@Operation(id = CallServiceForTokenOp.ID, category = Constants.CAT_DOCUMENT, label = "Call a REST Service", description = "Call a service, returns the raw JSON result."
+@Operation(id = CallServiceForTokenOp.ID, category = Constants.CAT_SERVICES, label = "Call a REST Service", description = "Call a service, returns the raw JSON result."
         + " The method is required and you pass in headersJsonStr all the required headers, and in bodyStr the raw body (for POST/PUT calls)."
         + " The operation calls the service and, so, gets a token."
         + " The operation returns a JSON blob (call its getString() method) containing the tokenUuid property in addition to the usual JSON return "

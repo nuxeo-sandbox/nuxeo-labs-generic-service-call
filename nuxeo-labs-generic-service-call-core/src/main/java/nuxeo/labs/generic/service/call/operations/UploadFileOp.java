@@ -11,6 +11,7 @@ import org.nuxeo.ecm.automation.core.annotations.Param;
 import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.Blobs;
 import org.nuxeo.ecm.core.api.CoreSession;
+import org.nuxeo.ecm.core.api.DocumentModel;
 import org.nuxeo.ecm.core.api.NuxeoException;
 
 import nuxeo.labs.generic.service.call.AuthenticationToken;
@@ -21,13 +22,15 @@ import nuxeo.labs.generic.service.call.http.ServiceCallResult;
 /**
  *
  */
-@Operation(id = CallServiceOp.ID, category = Constants.CAT_SERVICES, label = "Call a REST Service", description = "Call a service, returns the raw result."
+@Operation(id = UploadFileOp.ID, category = Constants.CAT_SERVICES, label = "Upload a file to a REST service", description = "Upload a file to a REST service."
+        + " If input is a document, xpath parameter is used to get the blob (default file:content). input can also be a Blob."
+        + " httpMethod must be either POST or PUT. If POST, multipart/chincks upload is handled."
         + " If tokenUuid is passed, it corresponds to a token fetched in a previous call (to Service.CallRESTServiceForToken) and it will be reused. If"
         + " expired, a new token will be automatically fetched. The 'Authentication: Bearer <the token>' header will then be added to the headers."
         + " If tokenUuid is not passed, then either the call is unauthenticated or you passed all the necessary info in the headers.")
-public class CallServiceOp {
+public class UploadFileOp {
 
-    public static final String ID = "Services.CallRESTService";
+    public static final String ID = "Services.UploadFile";
 
     @Context
     protected CoreSession session;
@@ -35,7 +38,6 @@ public class CallServiceOp {
     @Param(name = "tokenUuid", required = false)
     protected String tokenUuid;
 
-    // If not passed, we assume the headers have the authentication info
     @Param(name = "httpMethod", required = true)
     protected String httpMethod;
 
@@ -44,12 +46,21 @@ public class CallServiceOp {
 
     @Param(name = "headersJsonStr", required = false)
     protected String headersJsonStr;
-
-    @Param(name = "bodyStr", required = false)
-    protected String bodyStr;
+    
+    @Param(name = "xpath", required = false)
+    protected String xpath = "file:content";
 
     @OperationMethod
-    public Blob run() {
+    public Blob run(DocumentModel doc) {
+        
+        Blob blob = (Blob) doc.getPropertyValue(xpath);
+        
+        return run(blob);
+
+    }
+    
+    @OperationMethod
+    public Blob run(Blob blob) {
         
         ServiceCallResult result = null;
         
@@ -62,25 +73,8 @@ public class CallServiceOp {
             headers.put("Authentication", "Bearer " + tokenStr);
         }
         
-        switch (httpMethod.toUpperCase()) {
-        case "GET":
-            result = serviceCall.get(url, headers);
-            break;
-            
-        case "POST":
-            result = serviceCall.post(url, headers, bodyStr);
-            break;
-            
-        case "PUT":
-            result = serviceCall.put(url, headers, bodyStr);
-            break;
-            
-        default:
-            throw new NuxeoException("Operation supports only GET/PUT or POST. Received <" + httpMethod + ">");
-        }
-        
+        result = serviceCall.uploadBlob(httpMethod, blob, url, headers);
         
         return Blobs.createJSONBlob(result.toJsonString());
-
     }
 }
