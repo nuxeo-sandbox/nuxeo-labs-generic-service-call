@@ -196,7 +196,7 @@ function run(input, params) {
   
   // ====================> Upload a file, with POST, from custom field myschema:myfile of the input
   resultBlob = Services.UploadFile(
-    null, {
+    input, {
       "tokenUuid": tokenId,
       "httpMethod": "POST",
       "url": baseUrl + "/someEndpointWithPOST",
