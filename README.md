@@ -186,7 +186,7 @@ function run(input, params) {
   }
   
   // ====================> Download a file
-  Blob downloaded = Services.DownloadFile(
+  var downloaded = Services.DownloadFile(
     null, {
       "tokenUuid": tokenId,
       "url": baseUrl + "/someEndpoint/For/A/File/T/DoDownload"
