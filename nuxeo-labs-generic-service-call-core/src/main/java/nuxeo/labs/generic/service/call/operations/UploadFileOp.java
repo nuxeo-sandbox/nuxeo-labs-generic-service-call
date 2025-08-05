@@ -12,7 +12,6 @@ import org.nuxeo.ecm.core.api.Blob;
 import org.nuxeo.ecm.core.api.Blobs;
 import org.nuxeo.ecm.core.api.CoreSession;
 import org.nuxeo.ecm.core.api.DocumentModel;
-import org.nuxeo.ecm.core.api.NuxeoException;
 
 import nuxeo.labs.generic.service.call.AuthenticationToken;
 import nuxeo.labs.generic.service.call.AuthenticationTokens;
