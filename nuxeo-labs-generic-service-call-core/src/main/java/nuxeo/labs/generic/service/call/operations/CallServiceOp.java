@@ -58,6 +58,11 @@ public class CallServiceOp {
         
         if(StringUtils.isNotBlank(tokenUuid)) {
             AuthenticationToken token = AuthenticationTokens.getInstance().getToken(tokenUuid);
+            if(token == null) {
+                // Token was not stored, most likely because it failed
+                result = new ServiceCallResult("Invalid token. tokenUuid is valid, but the previous call failed.", -1, "Wring token");
+                return Blobs.createJSONBlob(result.toJsonString());
+            }
             String tokenStr = token.getToken();
             headers.put("Authentication", "Bearer " + tokenStr);
         }

@@ -1,14 +1,20 @@
 # nuxeo-labs-generic-service-call
 
-This plugin calls a service and returns the result. Caller is in charge of using the correct HTTP verb (Support for GET/PUT/POST) and setting the correct payload when needed. As first implementation this plugin has some limitation (see below). But anyone is welcome to Pull request :-).
+This plugin calls a service (HTTP GET/POST/PUT), and returns the result. Caller is in charge of setting the expected payload when needed, specific headers if any, etc.
 
-One of the goal of the plugin is to handle authentication token (typically for M2M communication) with an expiration time, so as long as a token is not expired, there is no need to request a new one.
+> [!NOTE]
+> Also, most of this could likely be done with Nuxeo native [Automation Helper](https://doc.nuxeo.com/nxdoc/automation-helpers), `HTTP.call()`. But the plugin handles:
+> * Bearer token expiration when needed
+> * Simple Upload and download of files
+> * Get the response code (200, 201, 400, ...) and message from the server
+
+One of the goals of the plugin is to handle authentication bearer token (typically for M2M communication) with an expiration time, so as long as a token is not expired, there is no need to request a new one.
 
 The plugin is agnostic of URLs, client IDs, client secrets, etc. All these are the caller responsibility. Typically, these will be values set in nuxeo.conf, loaded before the call to the plugin. See example(s) below.
 
-Once installed, usage of the pluygin is done via automation
+Once installed, usage of the plugin is done via automation.
 
-### Typical Usage of Automation Operations
+### Typical Usage of Automation Operations when Doing M2M Communication with bearer Tokens
 
 (See detailled examples below)
 
@@ -16,7 +22,10 @@ Typically, you will do the following:
 
 1. Have nuxeo.conf parameters with your URLs, authentication info (like clientId/secret), etc.
 2. Using these, call the `Services.CallRESTServiceForToken` to get a token information
-3. Then, in all subsequent calls to a service requiring this token, you call `Services.CallRESTService`, passing the token UUID as a parameter. `Services.CallRESTService` wil use the token and ask for a new one if it is expired.
+3. Then, in all subsequent calls to a service requiring this token, you call `Services.CallRESTService`, passing the token UUID as a parameter. `Services.CallRESTService` will use the token and ask for a new one if it is expired.
+
+Notice using a bearer token is absolutly not required with this plugin: You can call whatever service you need, as you can set up the headers and body as needed.
+
 
 <br>
 
@@ -27,9 +36,26 @@ Typically, you will do the following:
 * `Services.DownloadFile`
 * `Services.UploadFile`
 
+### About the Result of Operations
+
+Most operations, when possible, return a JSON Blob holding a JSON string (some, like downloading a file, return the blob of the file directly), so you must cal its `getString()` method. Thios JSON. Can hold different properties, but you will always find the response values from the server: `responseCode` (typically, 200) and `responseMessage` ("OK" for example), so you can check the response in case of issue. See the examples below, but basically, for these operations:
+
+```javascript
+. . .
+  var resultBlob = Services.CallREST...etc...
+  var resultJsonStr = resultBlob.getString();
+  var resultJson = JSON.parse(resultJsonStr);
+  if(resultJson.responseCode === 200) {
+    . . .
+  }
+. . .
+```
+
+<br>
+
 ### `Services.CallRESTServiceForToken`
 
-Call a service for M2M token authentication purpose. Returns a JSON blobn with the values plus a specific `tokenUuid` property, to be used for next calls, and, so, avoid asking for a new token only when needed (when the token is expired)
+Call a service for M2M token authentication purpose. Returns a JSON blob with the values, the `responseCode` and `responseMessage`, plus a specific `tokenUuid` property, to be used for next calls, and so, avoid asking for a new token while current one is valid (be cool with the distant server).
 
 * Input: `void`
 * Output: `blob`, a JSON blob, result of the call (use its `getString()` method to get the JSON string)
@@ -39,11 +65,37 @@ Call a service for M2M token authentication purpose. Returns a JSON blobn with t
   * `headersJsonStr`: String, optional. A JSON string with the headers to use.
   * `bodyStr`: String, optional. The body to pass as is, if needed (for POST/PUT only)
 
-The operation creates a Token object, stored in memory so it can be reused. The object stores the misc. info (method, url, etc.), so it can get a new token when needed. For subsequent calls, you just have to pass its `tokenUuid` field. This is what the plugin will use to load this token, check if it is expired and request a new one if needed (see examples below)
+The operation creates a Token object, stored in memory so it can be reused later. The object stores the misc. info (method, url, etc.), so it can get a new token when needed. For subsequent calls, you just have to pass its `tokenUuid` field. This is what the plugin will use to load this token, check if it is expired and request a new one if needed (see examples below).
+
+If your request is not correct (wrong client Id, wrong body for a POST, ...), you will likely get a 400 `responseCode`, with the "Bad Request" `responseMessage`.
+
+> [!IMPORTANT]
+> If a token could not be fetched, the `tokenUuid` will be ignored in further calls to `Services.CallREST...`, and these calls will return an error. So, you should always check the result is a valid `reponseCode` (200-299 depending on the service, but for token, it should be 200).
+
+```javascript
+. . .
+    resultBlob = Services.CallRESTServiceForToken(
+      null, {
+        "httpMethod": "POST",
+        "url": "https://some auth. url",
+        "headersJsonStr": "{headers as json as expected by the service}",
+        "bodyStr": "{body as json is expected by the service}"
+      });
+    tokenInfoJson = JSON.parse(resultBlob.getString());
+    if(tokenInfoJson.responseCode !== 200) {
+      . . . handle error. . .
+    } else {
+      tokenId = tokenInfoJson.tokenUuid;
+      . . .
+    }
+. . .
+```
+
+<br>
 
 ### `Services.CallRESTService`
 
-Call a service and returns the result as JSON.
+Call a service and returns the result as JSON. The returned JSON will have 3 properties: `responseCode` and `responseMessage` from the server, and the `response`, holding the actuall response (when the call is succesful)
 
 * Input: `void`
 * Output: `blob`, a JSON blob, result of the call (use its `getString()` method to get the JSON string)
@@ -60,7 +112,11 @@ If `tokenUuid` is passed, it corresponds to a token fetched in a previous call t
 
 When `tokenUuid` is passed, the operaiton adds the `Authentication: Bearer <the_token_value>` header.
 
+Notice depending on the service you are calling, `response` may not be JSON, of course, but a simple string for example.
+
 See below the example(s) of use.
+
+<br>
 
 ### `Services.DownloadFile`
 
@@ -75,9 +131,11 @@ Call a service to download a File and returns the corresponding Blob
 
 The method calls the service at `url`, and downloadq the corresponding file, encapsulating to a regular `Blob`
 
+<br>
+
 ### `Services.UploadFile`
 
-Call a service to upload a File, using "POST" or "PUT"
+Call a service to upload a File, using "POST" or "PUT". Returns the same JSON blob as for `Services.CallRESTService`, so you have `responseCode`, `responseMessage` and `response` properties.
 
 * Input: `blob` or `document`
 * Output: `blob`, a JSON blob, result of the call (use its `getString()` method to get the JSON string)
@@ -89,7 +147,6 @@ Call a service to upload a File, using "POST" or "PUT"
   * `xpath`: String, optional. The XPATH to use when the input is `document`. Default is the main blob, at `file:content`.
 
 The method calls the service at `url`, and uploads the file backed by the blob.
-
 
 <br>
 
@@ -145,6 +202,10 @@ function run(input, params) {
     });
   
   tokenInfoJson = JSON.parse(resultBlob.getString());
+  if(tokenInfoJson.resultCode !== 200) {
+    // . . .handle the error . . .
+    // and return
+  })
   tokenId = tokenInfoJson.tokenUuid;
   
   // ====================> Call service #1
@@ -212,7 +273,6 @@ function run(input, params) {
 
 }
 ```
-
 
 <br>
 

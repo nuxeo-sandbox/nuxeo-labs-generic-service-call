@@ -58,6 +58,8 @@ public class AuthenticationToken {
     protected JSONObject serviceResponse;
 
     protected ServiceCall serviceCall = new ServiceCall();
+    
+    protected ServiceCallResult lastServiceCallresult = null;
 
     public AuthenticationToken(String httpMethod, String authFullUrl, Map<String, String> headers, String body) {
 
@@ -89,27 +91,25 @@ public class AuthenticationToken {
             return token;
         }
 
-        ServiceCallResult result;
-
         switch (httpMethod) {
         case "GET":
-            result = serviceCall.get(authFullUrl, headers);
+            lastServiceCallresult = serviceCall.get(authFullUrl, headers);
             break;
             
         case "POST":
-            result = serviceCall.post(authFullUrl, headers, body);
+            lastServiceCallresult = serviceCall.post(authFullUrl, headers, body);
             break;
 
         case "PUT":
-            result = serviceCall.put(authFullUrl, headers, body);
+            lastServiceCallresult = serviceCall.put(authFullUrl, headers, body);
             break;
 
         default:
             throw new NuxeoException("Invalid HTTP method (<" + httpMethod + ">: We support only GET/POST/PUSH.");
         }
 
-        if (result.callWasSuccesful()) {
-            serviceResponse = result.getResponseAsJSONObject();
+        if (lastServiceCallresult.callWasSuccesful()) {
+            serviceResponse = lastServiceCallresult.getResponseAsJSONObject();
             // {"error":"invalid_grant","error_description":"Caller not authorized for requested resource"}
             if (serviceResponse.has("error")) {
                 String msg = "Getting a token failed with error " + serviceResponse.getString("error") + ".";
@@ -117,14 +117,17 @@ public class AuthenticationToken {
                     msg += " " + serviceResponse.getString("error_description");
                 }
                 log.error(msg);
+                token = null;
+                serviceResponse = null;
             } else {
                 token = serviceResponse.getString("access_token");
                 int expiresIn = serviceResponse.getInt("expires_in");
                 tokenExpiration = Instant.now().plusSeconds(expiresIn - 15);
             }
         } else {
-            log.error("Error getting an auth token:\n" + result.toJsonString(2));
+            log.error("Error getting an auth token:\n" + lastServiceCallresult.toJsonString(2));
             token = null;
+            serviceResponse = null;
         }
 
         return token;
@@ -153,8 +156,11 @@ public class AuthenticationToken {
         JSONObject obj = null;
         if(serviceResponse != null) {
             obj = new JSONObject(serviceResponse.toString());
+            obj.put("responseCode", lastServiceCallresult.getResponseCode());
+            obj.put("responseMessage", lastServiceCallresult.getResponseMessage());
         } else {
-            obj = new JSONObject();
+            //obj = new JSONObject();
+            obj = lastServiceCallresult.toJsonObject();
         }
         obj.put("tokenUuid", id);
         

@@ -20,6 +20,7 @@ package nuxeo.labs.generic.service.call.test;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -49,6 +50,7 @@ import org.nuxeo.runtime.test.runner.Deploy;
 import org.nuxeo.runtime.test.runner.Features;
 import org.nuxeo.runtime.test.runner.FeaturesRunner;
 
+import nuxeo.labs.generic.service.call.http.ServiceCallResult;
 import nuxeo.labs.generic.service.call.operations.CallServiceForTokenOp;
 import nuxeo.labs.generic.service.call.operations.DownloadFileOp;
 import nuxeo.labs.generic.service.call.operations.UploadFileOp;
@@ -83,7 +85,8 @@ public class TestOperations {
         // Using a Mockserver
         try (MockWebServer server = new MockWebServer()) {
             // Enqueue a mock response
-            server.enqueue(new MockResponse().setBody("{\"access_token\":\"123\", \"expires_in\": 3, \"token_type\":\"Bearer\"}")
+            server.enqueue(new MockResponse().setResponseCode(200)
+                                             .setBody("{\"access_token\":\"123\", \"expires_in\": 3, \"token_type\":\"Bearer\"}")
                                              .addHeader("Content-Type", "application/json"));
             // Start server
             server.start();
@@ -107,6 +110,7 @@ public class TestOperations {
             assertNotNull(resultJsonStr);
             
             JSONObject resultJson = new JSONObject(resultJsonStr);
+            assertEquals(resultJson.getInt("responseCode"), 200);
             assertNotNull(resultJson.get("tokenUuid"));
             assertEquals("123", resultJson.get("access_token"));
             assertEquals(3, resultJson.get("expires_in"));
@@ -121,6 +125,34 @@ public class TestOperations {
 
         }
     }
+    
+    @Test
+    public void testGetTokenShouldFail() throws Exception {
+        
+        OperationContext ctx = new OperationContext(session);
+        Map<String, Object> params = new HashMap<>();
+        params.put("httpMethod", "post");
+        params.put("url", "https://blahblah.com.uiuiuiui");
+        Map<String, String> headers = Map.of("Authorization", "Basic EncodedClientId:ClientSecret", "Content-Type",
+                "application/json");
+        JSONObject headersJson = new JSONObject(headers);
+        params.put("headersJsonStr", headersJson.toString());
+        params.put("bodyStr", "{\"something\":\"we don't actually care\"}");
+        
+        Blob resultBlob = (Blob) automationService.run(ctx, CallServiceForTokenOp.ID, params);
+        assertNotNull(resultBlob);
+        
+        String resultJsonStr = resultBlob.getString();
+        assertNotNull(resultJsonStr);
+        
+        JSONObject resultJson = new JSONObject(resultJsonStr);
+        assertNotNull(resultJson.get("tokenUuid"));
+        
+        assertTrue(resultJson.has("responseCode"));
+        int responseCode = resultJson.getInt("responseCode");
+        assertFalse(ServiceCallResult.isHttpSuccess(responseCode));
+    }
+    
     
     @Test
     public void shopuldUploadFileWithPOSTAndMockServer() throws Exception {

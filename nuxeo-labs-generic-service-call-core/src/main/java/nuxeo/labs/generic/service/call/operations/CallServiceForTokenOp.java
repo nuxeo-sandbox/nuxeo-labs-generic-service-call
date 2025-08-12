@@ -2,6 +2,7 @@ package nuxeo.labs.generic.service.call.operations;
 
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.nuxeo.ecm.automation.core.Constants;
 import org.nuxeo.ecm.automation.core.annotations.Context;
 import org.nuxeo.ecm.automation.core.annotations.Operation;
@@ -23,7 +24,8 @@ import nuxeo.labs.generic.service.call.http.ServiceCall;
         + " The method is required and you pass in headersJsonStr all the required headers, and in bodyStr the raw body (for POST/PUT calls)."
         + " The operation calls the service and, so, gets a token."
         + " The operation returns a JSON blob (call its getString() method) containing the tokenUuid property in addition to the usual JSON return "
-        + " containing the token (with access_token, expires_in, etc.). Other calls expect only the tokenUuid.")
+        + " containing the token (with access_token, expires_in, etc.) and the responseCode and responseMessage from the service."
+        + " Other operations expect only the tokenUuid.")
 public class CallServiceForTokenOp {
 
     public static final String ID = "Services.CallRESTServiceForToken";
@@ -52,6 +54,11 @@ public class CallServiceForTokenOp {
         // Call the service so we see if things work
         @SuppressWarnings("unused")
         String tokenValue = token.getToken();
+        
+        // If the call failed, no need to store it in memory
+        if(StringUtils.isBlank(tokenValue)) {
+            AuthenticationTokens.getInstance().removeToken(token.getId());
+        }
         
         return Blobs.createJSONBlob(token.tokenToJSONObject().toString());
 
