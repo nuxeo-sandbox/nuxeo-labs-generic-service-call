@@ -55,7 +55,7 @@ public class DownloadFileOp {
         if(StringUtils.isNotBlank(tokenUuid)) {
             AuthenticationToken token = AuthenticationTokens.getInstance().getToken(tokenUuid);
             String tokenStr = token.getToken();
-            headers.put("Authentication", "Bearer " + tokenStr);
+            headers.put("Authorization", "Bearer " + tokenStr);
         }
         
         result = serviceCall.downloadFile(url, headers);

@@ -64,7 +64,7 @@ public class CallServiceOp {
                 return Blobs.createJSONBlob(result.toJsonString());
             }
             String tokenStr = token.getToken();
-            headers.put("Authentication", "Bearer " + tokenStr);
+            headers.put("Authorization", "Bearer " + tokenStr);
         }
         
         switch (httpMethod.toUpperCase()) {
