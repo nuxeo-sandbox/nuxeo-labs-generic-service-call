@@ -182,7 +182,8 @@ public class ServiceCall {
     }
 
     /**
-     * Upload a file with PUT or POST. If POST, ahdnel big files and sending chunks.
+     * Upload a file with PUT or POST. If POST, handle big files and sending chunks.
+     * If headers alsready has a COntent-Type, we don't recalculate it
      * 
      * @param putOrPost
      * @param file
@@ -195,7 +196,7 @@ public class ServiceCall {
      */
     public ServiceCallResult uploadFile(String putOrPost, File file, String targetUrl, String contentType,
             Map<String, String> headers) {
-        
+
         putOrPost = putOrPost.toUpperCase();
         switch (putOrPost) {
         case "POST":
@@ -203,11 +204,24 @@ public class ServiceCall {
             break;
 
         default:
-            throw new NuxeoException("Oonly PUT or POST handled.");
+            throw new NuxeoException("Only PUT or POST handled.");
         }
-        
+
         ServiceCallResult result = null;
 
+        if (headers != null) {
+            String contentTypeHeader = headers.entrySet()
+                                              .stream()
+                                              .filter(e -> e.getKey().equalsIgnoreCase("Content-Type"))
+                                              .map(Map.Entry::getValue)
+                                              .findFirst()
+                                              .orElse(null);
+
+            if(contentTypeHeader != null) {
+                contentType = contentTypeHeader;
+            }
+        }
+        
         if (StringUtils.isBlank(contentType)) {
             try {
                 contentType = Files.probeContentType(file.toPath());
@@ -215,10 +229,10 @@ public class ServiceCall {
                 contentType = "application/octet-stream";
             }
         }
-        
+
         try {
             HttpClient client = HttpClient.newHttpClient();
-    
+
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                                                      .uri(URI.create(targetUrl))
                                                      .header("Content-Type", contentType);
@@ -226,17 +240,17 @@ public class ServiceCall {
             if (headers != null && !headers.isEmpty()) {
                 headers.forEach(builder::header);
             }
-            
+
             // Choose method
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofFile(file.toPath());
             switch (putOrPost) {
-                case "POST" -> builder.POST(body);
-                case "PUT" -> builder.PUT(body);
+            case "POST" -> builder.POST(body);
+            case "PUT" -> builder.PUT(body);
             }
-            
+
             // Build
             HttpRequest request = builder.build();
-    
+
             // Call
             HttpResponse<String> response;
             try {
@@ -251,9 +265,8 @@ public class ServiceCall {
         }
 
         return result;
-        
-    }
 
+    }
 
     /**
      * @param targetUrl
