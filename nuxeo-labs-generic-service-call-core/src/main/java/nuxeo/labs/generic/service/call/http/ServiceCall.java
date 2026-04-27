@@ -234,12 +234,16 @@ public class ServiceCall {
             HttpClient client = HttpClient.newHttpClient();
 
             HttpRequest.Builder builder = HttpRequest.newBuilder()
-                                                     .uri(URI.create(targetUrl))
-                                                     .header("Content-Type", contentType);
-            // Add custom headers
+                                                     .uri(URI.create(targetUrl));
+            // Add custom headers first (they take precedence)
             if (headers != null && !headers.isEmpty()) {
-                headers.forEach(builder::header);
+                headers.entrySet()
+                       .stream()
+                       .filter(e -> !e.getKey().equalsIgnoreCase("Content-Type"))
+                       .forEach(e -> builder.header(e.getKey(), e.getValue()));
             }
+            // Set Content-Type once (resolved above from headers or blob mime type)
+            builder.header("Content-Type", contentType);
 
             // Choose method
             HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofFile(file.toPath());
