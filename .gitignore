@@ -31,3 +31,5 @@ bin/
 *~gen
 .env
 nashorn_code_cache
+.opencode
+AGENTS.md
